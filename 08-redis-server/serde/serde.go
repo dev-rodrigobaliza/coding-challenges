@@ -11,6 +11,7 @@ const (
 	Integer
 	Array
 	Error
+	Null
 
 	End = "\r\n"
 )

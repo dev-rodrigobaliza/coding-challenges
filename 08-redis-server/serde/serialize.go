@@ -27,6 +27,9 @@ func serialize(ct CommandType, value string, array []CommandArray, err *CommandE
 	case Array:
 		return cmdToArray(array)
 
+	case Null:
+		return cmdToNull()
+
 	default:
 		return "", ErrInvalidCommandType
 	}
@@ -87,4 +90,9 @@ func cmdToArray(array []CommandArray) (string, error) {
 	}
 
 	return s.String(), nil
+}
+
+func cmdToNull() (string, error) {
+	str := fmt.Sprintf("$-1%s", End)
+	return str, nil
 }

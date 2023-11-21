@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"rs/serde"
+	"rs/store"
 	"strings"
 )
 
@@ -16,16 +17,18 @@ const (
 type Redis struct {
 	addr string
 	log  bool
+	data store.Store
 }
 
 var (
 	ErrServerStopped = errors.New("server is not started")
 )
 
-func New(addr string, log bool) *Redis {
+func New(addr string, data store.Store, log bool) *Redis {
 	return &Redis{
 		addr: addr,
 		log:  log,
+		data: data,
 	}
 }
 
@@ -99,6 +102,14 @@ func (r *Redis) handleCommand(cmd serde.Command, conn net.Conn) {
 			case "echo":
 				r.handleEcho(cmd, conn)
 				return
+
+			case "set":
+				r.handleSet(cmd, conn)
+				return
+
+			case "get":
+				r.handleGet(cmd, conn)
+				return
 			}
 		}
 	}
@@ -116,17 +127,57 @@ func (r *Redis) handlePing(conn net.Conn) {
 }
 
 func (r *Redis) handleEcho(cmd serde.Command, conn net.Conn) {
-	if len(cmd.Array) == 2 {
-		ca := cmd.Array[1]
-		c := serde.Command{
-			Type:  serde.SimpleString,
-			Value: ca.Value,
-		}
-
-		sendResponse(c, conn)
+	if len(cmd.Array) != 2 {
+		conn.Write(sendError("err", "bad echo request"))
+		return
 	}
 
-	conn.Write(sendError("err", "bad echo request"))
+	ca := cmd.Array[1]
+	c := serde.Command{
+		Type:  serde.SimpleString,
+		Value: ca.Value,
+	}
+	sendResponse(c, conn)
+}
+
+func (r *Redis) handleSet(cmd serde.Command, conn net.Conn) {
+	if len(cmd.Array) != 3 {
+		conn.Write(sendError("err", "bad set request"))
+		return
+	}
+
+	key := cmd.Array[1].Value
+	value := cmd.Array[2].Value
+	r.data.Set(key, value)
+	c := serde.Command{
+		Type:  serde.SimpleString,
+		Value: "OK",
+	}
+
+	sendResponse(c, conn)
+}
+
+func (r *Redis) handleGet(cmd serde.Command, conn net.Conn) {
+	if len(cmd.Array) != 2 {
+		conn.Write(sendError("err", "bad set request"))
+		return
+	}
+
+	key := cmd.Array[1].Value
+	value := r.data.Get(key)
+
+	var t serde.CommandType
+	if value == "" {
+		t = serde.Null
+	} else {
+		t = serde.SimpleString
+	}
+	c := serde.Command{
+		Type:  t,
+		Value: value,
+	}
+
+	sendResponse(c, conn)
 }
 
 func sendError(err string, msg string) []byte {
