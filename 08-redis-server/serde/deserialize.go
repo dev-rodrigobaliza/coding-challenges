@@ -10,7 +10,7 @@ func Deserialize(str string) (Command, error) {
 }
 
 func deserialize(str string) (Command, error) {
-	if str == "" || len(str) < 5 || !strings.HasSuffix(str, End) {
+	if str == "" || len(str) < len(End)+1 || !strings.HasSuffix(str, End) {
 		return Command{}, ErrInvalidString
 	}
 
@@ -244,7 +244,16 @@ func arrangeArrayItems(items []string) ([]string, error) {
 			continue
 		}
 
-		if item[0] == '*' {
+		switch item[0] {
+		case '$':
+			var builder strings.Builder
+			builder.WriteString(item)
+			builder.WriteString(items[i+1])
+
+			copy = append(copy, builder.String())
+			pos++
+
+		case '*':
 			if i == len(items)-1 {
 				return nil, ErrInvalidString
 			}
@@ -266,7 +275,8 @@ func arrangeArrayItems(items []string) ([]string, error) {
 
 			copy = append(copy, builder.String())
 			pos += size
-		} else {
+
+		default:
 			copy = append(copy, item)
 		}
 

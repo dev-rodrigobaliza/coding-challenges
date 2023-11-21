@@ -17,15 +17,15 @@ func main() {
 
 	if *inputFile == "" {
 		fmt.Println("please specify the input filename")
-		os.Exit(0)
+		os.Exit(1)
 	}
 	if *outputFile == "" {
 		fmt.Println("please specify the output filename")
-		os.Exit(0)
+		os.Exit(1)
 	}
 	if *performCompress && *performDecompress || !*performCompress && !*performDecompress {
 		fmt.Println("compress flag or decompress should one set to true")
-		os.Exit(0)
+		os.Exit(1)
 	}
 
 	if *performCompress {

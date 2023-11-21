@@ -12,7 +12,7 @@ const (
 	Array
 	Error
 
-	End = "\\r\\n"
+	End = "\r\n"
 )
 
 var (

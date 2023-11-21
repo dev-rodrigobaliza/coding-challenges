@@ -404,20 +404,44 @@ func TestDeserialize(t *testing.T) {
 						},
 					},
 					{
-						Type: serde.Array,
+						Type:  serde.Array,
 						Value: "",
 						Array: []serde.CommandArray{
 							{
-								Type: serde.Integer,
+								Type:  serde.Integer,
 								Value: "1",
 								Array: nil,
 							},
 							{
-								Type: serde.SimpleString,
+								Type:  serde.SimpleString,
 								Value: "test",
 								Array: nil,
 							},
 						},
+					},
+				},
+				Error: nil,
+			},
+			wantErr: nil,
+		},
+		{
+			name: "ping",
+			args: args{
+				str: "*2" + serde.End + "$5" + serde.End + "hello" + serde.End + "$1" + serde.End + "3" + serde.End,
+			},
+			want: serde.Command{
+				Type:  serde.Array,
+				Value: "",
+				Array: []serde.CommandArray{
+					{
+						Type:  serde.BulkString,
+						Value: "hello",
+						Array: nil,
+					},
+					{
+						Type:  serde.BulkString,
+						Value: "3",
+						Array: nil,
 					},
 				},
 				Error: nil,

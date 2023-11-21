@@ -111,13 +111,13 @@ func main() {
 
 	if *healthInterval == "" {
 		fmt.Println("please specify a valid health check interval (duration)")
-		os.Exit(0)
+		os.Exit(1)
 	}
 
 	hcInterval, err := time.ParseDuration(*healthInterval)
 	if err != nil {
 		fmt.Println("please specify a valid health check interval (duration)")
-		os.Exit(0)
+		os.Exit(1)
 	}
 
 	lb = New([]string{"http://localhost:8001", "http://localhost:8002"}, hcInterval)
