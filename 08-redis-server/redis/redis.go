@@ -20,10 +20,6 @@ type Redis struct {
 	data store.Store
 }
 
-var (
-	ErrServerStopped = errors.New("server is not started")
-)
-
 func New(addr string, data store.Store, log bool) *Redis {
 	return &Redis{
 		addr: addr,

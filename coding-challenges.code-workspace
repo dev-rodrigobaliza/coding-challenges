@@ -14,14 +14,14 @@
 		},
 		{
 			"path": "08-redis-server"
+		},
+		{
+			"path": "11-web-server"
 		}
 	],
 	"settings": {},
 	"launch": {
 		"version": "0.2.0",
-		"configurations": [
-
-
-		]
+		"configurations": []
 	}
 }
