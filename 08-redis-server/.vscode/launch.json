@@ -10,7 +10,10 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}/cmd/server/main.go",
-            "args": ["-log"]
+            "args": [
+                "-addr", ":6379",
+                "-log"
+            ]
         },
         {
             "name": "client",

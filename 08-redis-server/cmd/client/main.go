@@ -1,17 +1,13 @@
 package main
 
 import (
-	"context"
-
-	"github.com/redis/go-redis/v9"
+	"github.com/go-redis/redis"
 )
 
 func main() {
 	client := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
 
-	ctx := context.Background()
-
-	st := client.Ping(ctx)
+	st := client.Ping()
 	if st.Err() != nil {
 		panic(st.Err())
 	}
@@ -23,7 +19,7 @@ func main() {
 
 	println(res)
 
-	str := client.Echo(ctx, "Hello World")
+	str := client.Echo("Hello World")
 	if str.Err() != nil {
 		panic(str.Err())
 	}
