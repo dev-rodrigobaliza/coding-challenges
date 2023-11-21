@@ -1,0 +1,27 @@
+{
+	"folders": [
+		{
+			"path": "01-wc-tool"
+		},
+		{
+			"path": "02-json-parser"
+		},
+		{
+			"path": "03-huffman-compressor"
+		},
+		{
+			"path": "05-load-balancer"
+		},
+		{
+			"path": "08-redis-server"
+		}
+	],
+	"settings": {},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+
+
+		]
+	}
+}

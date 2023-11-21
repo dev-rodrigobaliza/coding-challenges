@@ -1,0 +1,32 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "huffman compressor",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/main.go",
+            "args": [
+                "-compress",
+                "-input", "test/test_data3.txt",
+                "-output", "test/test_data3.txt.hf",
+            ]
+        },
+        {
+            "name": "huffman decompressor",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/main.go",
+            "args": [
+                "-decompress",
+                "-input", "test/test_data1.txt.hf",
+                "-output", "test/test_data1.restored.txt",
+            ]
+        }
+    ]
+}
