@@ -112,6 +112,30 @@ func TestDeserialize(t *testing.T) {
 			wantErr: nil,
 		},
 		{
+			name: "invalid bulk string 1",
+			args: args{
+				str: "$",
+			},
+			want:    serde.Command{},
+			wantErr: serde.ErrInvalidString,
+		},
+		{
+			name: "invalid bulk string 2",
+			args: args{
+				str: "$" + serde.End,
+			},
+			want:    serde.Command{},
+			wantErr: serde.ErrInvalidString,
+		},
+		{
+			name: "invalid bulk string 3",
+			args: args{
+				str: "$" + serde.End + serde.End,
+			},
+			want:    serde.Command{},
+			wantErr: serde.ErrInvalidString,
+		},
+		{
 			name: "empty bulk string",
 			args: args{
 				str: "$0" + serde.End + serde.End,
@@ -154,13 +178,21 @@ func TestDeserialize(t *testing.T) {
 		{
 			name: "invalid integer 1",
 			args: args{
-				str: ":" + serde.End,
+				str: ":",
 			},
 			want:    serde.Command{},
 			wantErr: serde.ErrInvalidString,
 		},
 		{
 			name: "invalid integer 2",
+			args: args{
+				str: ":" + serde.End,
+			},
+			want:    serde.Command{},
+			wantErr: serde.ErrInvalidString,
+		},
+		{
+			name: "invalid integer 3",
 			args: args{
 				str: ":a" + serde.End,
 			},
@@ -172,7 +204,7 @@ func TestDeserialize(t *testing.T) {
 			args: args{
 				str: ":1" + serde.End,
 			},
-			want:    serde.Command{
+			want: serde.Command{
 				Type:  serde.Integer,
 				Value: "1",
 				Array: nil,
@@ -185,7 +217,7 @@ func TestDeserialize(t *testing.T) {
 			args: args{
 				str: ":+1" + serde.End,
 			},
-			want:    serde.Command{
+			want: serde.Command{
 				Type:  serde.Integer,
 				Value: "+1",
 				Array: nil,
@@ -198,10 +230,196 @@ func TestDeserialize(t *testing.T) {
 			args: args{
 				str: ":-1" + serde.End,
 			},
-			want:    serde.Command{
+			want: serde.Command{
 				Type:  serde.Integer,
 				Value: "-1",
 				Array: nil,
+				Error: nil,
+			},
+			wantErr: nil,
+		},
+		{
+			name: "invalid array 1",
+			args: args{
+				str: "*",
+			},
+			want:    serde.Command{},
+			wantErr: serde.ErrInvalidString,
+		},
+		{
+			name: "invalid array 2",
+			args: args{
+				str: "*" + serde.End,
+			},
+			want:    serde.Command{},
+			wantErr: serde.ErrInvalidString,
+		},
+		{
+			name: "invalid array 3",
+			args: args{
+				str: "*1" + serde.End,
+			},
+			want:    serde.Command{},
+			wantErr: serde.ErrInvalidString,
+		},
+		{
+			name: "invalid array 4",
+			args: args{
+				str: "*1" + serde.End + serde.End,
+			},
+			want:    serde.Command{},
+			wantErr: serde.ErrInvalidString,
+		},
+		{
+			name: "invalid array 5",
+			args: args{
+				str: "*1" + serde.End + ":1",
+			},
+			want:    serde.Command{},
+			wantErr: serde.ErrInvalidString,
+		},
+		{
+			name: "empty array",
+			args: args{
+				str: "*0" + serde.End,
+			},
+			want: serde.Command{
+				Type:  serde.Array,
+				Value: "",
+				Array: nil,
+				Error: nil,
+			},
+			wantErr: nil,
+		},
+		{
+			name: "valid array 1",
+			args: args{
+				str: "*1" + serde.End + ":1" + serde.End,
+			},
+			want: serde.Command{
+				Type:  serde.Array,
+				Value: "",
+				Array: []serde.CommandArray{
+					{
+						Type:  serde.Integer,
+						Value: "1",
+						Array: nil,
+					},
+				},
+				Error: nil,
+			},
+			wantErr: nil,
+		},
+		{
+			name: "valid array 2",
+			args: args{
+				str: "*2" + serde.End + ":1" + serde.End + ":2" + serde.End,
+			},
+			want: serde.Command{
+				Type:  serde.Array,
+				Value: "",
+				Array: []serde.CommandArray{
+					{
+						Type:  serde.Integer,
+						Value: "1",
+						Array: nil,
+					},
+					{
+						Type:  serde.Integer,
+						Value: "2",
+						Array: nil,
+					},
+				},
+				Error: nil,
+			},
+			wantErr: nil,
+		},
+		{
+			name: "valid array 3",
+			args: args{
+				str: "*2" + serde.End + ":1" + serde.End + "+test" + serde.End,
+			},
+			want: serde.Command{
+				Type:  serde.Array,
+				Value: "",
+				Array: []serde.CommandArray{
+					{
+						Type:  serde.Integer,
+						Value: "1",
+						Array: nil,
+					},
+					{
+						Type:  serde.SimpleString,
+						Value: "test",
+						Array: nil,
+					},
+				},
+				Error: nil,
+			},
+			wantErr: nil,
+		},
+		{
+			name: "valid subarray 1",
+			args: args{
+				str: "*1" + serde.End + "*1" + serde.End + ":1" + serde.End,
+			},
+			want: serde.Command{
+				Type:  serde.Array,
+				Value: "",
+				Array: []serde.CommandArray{
+					{
+						Type:  serde.Array,
+						Value: "",
+						Array: []serde.CommandArray{
+							{
+								Type:  serde.Integer,
+								Value: "1",
+								Array: nil,
+							},
+						},
+					},
+				},
+				Error: nil,
+			},
+			wantErr: nil,
+		},
+		{
+			name: "valid subarray 2",
+			args: args{
+				str: "*2" + serde.End + "*1" + serde.End + ":1" + serde.End + "*2" + serde.End + ":1" + serde.End + "+test" + serde.End,
+			},
+			want: serde.Command{
+				Type:  serde.Array,
+				Value: "",
+				Array: []serde.CommandArray{
+					{
+						Type:  serde.Array,
+						Value: "",
+						Array: []serde.CommandArray{
+							{
+								Type:  serde.Integer,
+								Value: "1",
+								Array: nil,
+							},
+						},
+					},
+					{
+						Type: serde.Array,
+						Value: "",
+						Array: []serde.CommandArray{
+							{
+								Type: serde.Integer,
+								Value: "1",
+								Array: nil,
+							},
+							{
+								Type: serde.SimpleString,
+								Value: "test",
+								Array: nil,
+							},
+						},
+					},
+				},
 				Error: nil,
 			},
 			wantErr: nil,
