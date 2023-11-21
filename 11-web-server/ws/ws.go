@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"path"
+	"strings"
 	"ws/web"
 )
 
@@ -83,6 +85,27 @@ func (ws *WebServer) handleCommand(rawReq []byte, conn net.Conn) {
 		return
 	}
 
-	msg := fmt.Sprintf("Requested path: %s", req.Path)
+	switch strings.ToUpper(req.Method) {
+	case "GET":
+		ws.handleGet(req, conn)
+		return
+
+	default:
+		web.SendResponse(400, "ERROR", "bad request", conn)
+	}
+}
+
+func (ws *WebServer) handleGet(req *web.Request, conn net.Conn) {
+	if req.Path == "/" {
+		req.Path = "/index.html"
+	}
+
+	file := path.Join(ws.dir, req.Path[1:])
+	msg, err := web.GetFile(file)
+	if err != nil {
+		web.SendResponse(404, "ERROR", "not found", conn)
+		return
+	}
+
 	web.SendResponse(200, "OK", msg, conn)
 }

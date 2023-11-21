@@ -17,13 +17,11 @@ type Request struct {
 	UserAgent string
 	Accept    string
 	Data      string
+	Headers   []string
 }
 
 func NewFromRaw(rawReq string) (*Request, error) {
 	parts := strings.Split(rawReq, end)
-	if len(parts) != 6 {
-		return nil, ErrInvalidRawReq
-	}
 
 	inner := strings.Split(parts[0], " ")
 	if len(inner) != 3 {
@@ -31,14 +29,32 @@ func NewFromRaw(rawReq string) (*Request, error) {
 	}
 
 	req := Request{
-		Method:    inner[0],
-		Path:      inner[1],
-		Version:   inner[2],
-		Host:      parts[1],
-		UserAgent: parts[2],
-		Accept:    parts[3],
-		Data:      parts[4],
+		Method:  inner[0],
+		Path:    inner[1],
+		Version: inner[2],
+	}
+
+	for i, item := range parts {
+		if i == 0 {
+			continue
+		}
+
+		getHeader(&req, item)
 	}
 
 	return &req, nil
+}
+
+func getHeader(req *Request, item string) {
+	if strings.HasPrefix(item, "Host:") {
+		req.Host = item[6:]
+	}
+	if strings.HasPrefix(item, "User-Agent:") {
+		req.UserAgent = item[12:]
+	}
+	if strings.HasPrefix(item, "Accept:") {
+		req.Accept = item[8:]
+	}
+
+	req.Headers = append(req.Headers, item)
 }
