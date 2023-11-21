@@ -21,6 +21,9 @@ func Deserialize(str string) (Command, error) {
 	case '$':
 		return bulkStringToCmd(str[1:])
 
+	case ':':
+		return integerToCmd(str[1:])
+
 	default:
 		return Command{}, ErrInvalidCommandType
 	}
@@ -72,7 +75,7 @@ func bulkStringToCmd(str string) (Command, error) {
 		return Command{}, ErrInvalidString
 	}
 
-	size, err := strconv.Atoi(str[:pos-1])
+	size, err := strconv.Atoi(str[:pos])
 	if err != nil {
 		return Command{}, ErrInvalidString
 	}
@@ -84,6 +87,20 @@ func bulkStringToCmd(str string) (Command, error) {
 
 	cmd := Command{
 		Type:  BulkString,
+		Value: str,
+	}
+
+	return cmd, nil
+}
+
+func integerToCmd(str string) (Command, error) {
+	_, err := strconv.Atoi(str)
+	if err != nil {
+		return Command{}, ErrInvalidString
+	}
+
+	cmd := Command{
+		Type:  Integer,
 		Value: str,
 	}
 

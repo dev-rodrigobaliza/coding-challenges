@@ -143,8 +143,68 @@ func TestDeserialize(t *testing.T) {
 			args: args{
 				str: "$11" + serde.End + "bulk string" + serde.End,
 			},
+			want: serde.Command{
+				Type:  serde.BulkString,
+				Value: "bulk string",
+				Array: nil,
+				Error: nil,
+			},
+			wantErr: nil,
+		},
+		{
+			name: "invalid integer 1",
+			args: args{
+				str: ":" + serde.End,
+			},
 			want:    serde.Command{},
 			wantErr: serde.ErrInvalidString,
+		},
+		{
+			name: "invalid integer 2",
+			args: args{
+				str: ":a" + serde.End,
+			},
+			want:    serde.Command{},
+			wantErr: serde.ErrInvalidString,
+		},
+		{
+			name: "valid integer",
+			args: args{
+				str: ":1" + serde.End,
+			},
+			want:    serde.Command{
+				Type:  serde.Integer,
+				Value: "1",
+				Array: nil,
+				Error: nil,
+			},
+			wantErr: nil,
+		},
+		{
+			name: "valid integer positive",
+			args: args{
+				str: ":+1" + serde.End,
+			},
+			want:    serde.Command{
+				Type:  serde.Integer,
+				Value: "+1",
+				Array: nil,
+				Error: nil,
+			},
+			wantErr: nil,
+		},
+		{
+			name: "valid integer negative",
+			args: args{
+				str: ":-1" + serde.End,
+			},
+			want:    serde.Command{
+				Type:  serde.Integer,
+				Value: "-1",
+				Array: nil,
+				Error: nil,
+			},
+			wantErr: nil,
 		},
 	}
 	for _, tt := range tests {
