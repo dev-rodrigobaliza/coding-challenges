@@ -46,7 +46,7 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 
-	if err := m.Stop(); err != nil {
+	if err := m.Stop(""); err != nil {
 		os.Exit(1)
 	}
 }
