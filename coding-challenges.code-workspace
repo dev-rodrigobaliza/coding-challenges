@@ -20,6 +20,9 @@
 		},
 		{
 			"path": "16-irc-client"
+		},
+		{
+			"path": "17-memcached"
 		}
 	],
 	"settings": {},

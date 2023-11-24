@@ -29,7 +29,7 @@ func (m *Manager) Start(ssl bool, addr, port, user, nick, pass string) error {
 	m.nick = nick
 	m.cli = client.New(m.rxProcessor)
 	if err := m.cli.Connect(addr, port, ssl); err != nil {
-		m.logger.Error("failed toconnect to the irc server", slog.Any("err", err))
+		m.logger.Error("failed to connect to the irc server", slog.Any("err", err))
 		return err
 	}
 
