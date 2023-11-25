@@ -26,6 +26,9 @@
 		},
 		{
 			"path": "22-dns-resolver"
+		},
+		{
+			"path": "25-nats-message-broker"
 		}
 	],
 	"settings": {},
