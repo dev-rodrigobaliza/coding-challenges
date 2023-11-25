@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -20,13 +21,20 @@ type address struct {
 }
 
 func main() {
-	//qry := "dns.google.com"
-	qry := "www.cnn.com"
-	req := messageBuilder(qry)
+	host := flag.String("host", "dns.google.com", "host name to query ip address")
+
+	flag.Parse()
+
+	if *host == "" {
+		fmt.Println("please specify a valid host name")
+		os.Exit(1)
+	}
+
+	req := messageBuilder(*host)
 	res := askDNS(req)
 	addrs := parseResponse(req, res)
 
-	fmt.Printf("%q ips:\n", qry)
+	fmt.Printf("%q ips:\n", *host)
 	for _, a := range addrs {
 		fmt.Printf("\t%+v\n", a)
 	}
@@ -203,7 +211,7 @@ func parseHost(raw []byte) string {
 
 		s := int(raw[pos])
 		pos++
-		b.Write(raw[pos:pos+s])
+		b.Write(raw[pos : pos+s])
 		pos += s
 	}
 
