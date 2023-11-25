@@ -127,7 +127,7 @@ func (m *Memcached) handleMessage(conn net.Conn, msg string) {
 
 func (m *Memcached) handleCommand(conn net.Conn, cmd *command) {
 	switch cmd.Name {
-	case "set":
+	case "set", "add", "replace", "append", "prepend":
 		m.cmdSet(conn, cmd)
 
 	case "get":
@@ -142,18 +142,45 @@ func (m *Memcached) handleCommand(conn net.Conn, cmd *command) {
 }
 
 func (m *Memcached) cmdSet(conn net.Conn, cmd *command) {
-	// if m.data.Get(cmd.Key) != nil {
-	// 	m.logger.Warn("failed to execute command set", slog.String("status", "key already exists"), slog.String("key", cmd.Key))
-	// 	if !cmd.NoReply {
-	// 		m.sendError(conn, notStored)
-	// 	}
+	v := m.data.Get(cmd.Key)
+	if cmd.Name == "add" && v != nil {
+		m.logger.Warn("failed to execute command "+cmd.Name, slog.String("status", "key already exists"), slog.String("key", cmd.Key))
+		if !cmd.NoReply {
+			m.sendError(conn, notStored)
+		}
 
-	// 	return
-	// }
+		return
+	} else if (cmd.Name == "replace" || cmd.Name == "append" || cmd.Name == "prepend") && v == nil {
+		m.logger.Warn("failed to execute command "+cmd.Name, slog.String("status", "key does not exist"), slog.String("key", cmd.Key))
+		if !cmd.NoReply {
+			m.sendError(conn, notStored)
+		}
+
+		return
+	}
+
+	if cmd.Name == "append" || cmd.Name == "prepend" {
+		var c command
+		err := json.Unmarshal(v, &c)
+		if err != nil {
+			m.logger.Error("failed to execute command "+cmd.Name, slog.String("status", "failed to unmarshal data"), slog.Any("err", err))
+			if !cmd.NoReply {
+				m.sendError(conn, notStored)
+			}
+
+			return
+		}
+
+		if cmd.Name == "append" {
+			cmd.Data = append(c.Data, cmd.Data...)
+		} else if cmd.Name == "prepend" {
+			cmd.Data = append(cmd.Data, c.Data...)
+		}
+	}
 
 	val, err := json.Marshal(cmd)
 	if err != nil {
-		m.logger.Error("failed to execute command set", slog.String("status", "failed to marshal data"), slog.Any("err", err))
+		m.logger.Error("failed to execute command "+cmd.Name, slog.String("status", "failed to marshal data"), slog.Any("err", err))
 		if !cmd.NoReply {
 			m.sendError(conn, notStored)
 		}
@@ -188,6 +215,7 @@ func (m *Memcached) cmdGet(conn net.Conn, cmd *command) {
 	}
 
 	if c.Timestamp > 0 && c.Timestamp < time.Now().UnixMicro() {
+		m.data.Delete(cmd.Key)
 		if !cmd.NoReply {
 			m.sendMessage(conn, end)
 		}

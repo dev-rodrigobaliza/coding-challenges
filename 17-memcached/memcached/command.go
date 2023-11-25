@@ -40,7 +40,7 @@ func newCommand(msgs []string) *command {
 			return nil
 		}
 
-	case "set":
+	case "set", "add", "replace", "append", "prepend":
 		f, err = strconv.ParseUint(parts[2], 10, 16)
 		if err != nil {
 			return nil
