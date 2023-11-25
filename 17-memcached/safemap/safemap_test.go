@@ -31,17 +31,17 @@ func TestSafeMap_Insert(t *testing.T) {
 		name      string
 		s         *safemap.SafeMap
 		key       string
-		value     string
+		value     []byte
 		wantKey   string
-		wantValue string
+		wantValue []byte
 	}{
-		{"insert", safeMap, "k1", "v1", "k1", "v1"},
+		{"insert", safeMap, "k1", []byte("v1"), "k1", []byte("v1")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.s.Set(tt.key, tt.value)
 			got := tt.s.Get(tt.wantKey)
-			if got != tt.wantValue {
+			if string(got) != string(tt.wantValue) {
 				t.Errorf("SafeMap.Insert() insert key %v value %v, want value %v", tt.key, tt.value, tt.wantValue)
 			}
 		})

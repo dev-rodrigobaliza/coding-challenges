@@ -1,12 +1,7 @@
 package safemap
 
 import (
-	"errors"
 	"sync"
-)
-
-var (
-	errNotFoundKey = errors.New("key not found")
 )
 
 type SafeMap struct {
@@ -34,11 +29,12 @@ func (s *SafeMap) Delete(key string) {
 
 func (s *SafeMap) Get(key string) string {
 	s.RLock()
+	defer s.RUnlock()
+
 	value, ok := s.data[key]
 	if !ok {
 		return ""
 	}
-	s.RUnlock()
 
 	return value
 }
