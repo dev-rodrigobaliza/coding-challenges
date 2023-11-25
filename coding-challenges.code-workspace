@@ -23,6 +23,9 @@
 		},
 		{
 			"path": "17-memcached"
+		},
+		{
+			"path": "22-dns-resolver"
 		}
 	],
 	"settings": {},
