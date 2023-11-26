@@ -1,9 +1,12 @@
 package main
 
 import (
-	"bytes"
+	"bufio"
+	"errors"
 	"fmt"
+	"io"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -18,80 +21,48 @@ func main() {
 		panic(err)
 	}
 	defer conn.Close()
-
-	buffer := make([]byte, 1024)
-	n, err := conn.Read(buffer)
-	if err != nil {
-		panic(err)
-	}
-
-	log(buffer[:n])
+	go handleResponses(conn)
+	time.Sleep(time.Second)
 
 	// connect
 	if _, err := conn.Write([]byte("connect {}" + end)); err != nil {
 		panic(err)
 	}
-
-	n, err = conn.Read(buffer)
-	if err != nil {
-		panic(err)
-	}
-
-	log(buffer[:n])
+	time.Sleep(time.Second)
 
 	// ping
 	if _, err := conn.Write([]byte("ping" + end)); err != nil {
 		panic(err)
 	}
-
-	n, err = conn.Read(buffer)
-	if err != nil {
-		panic(err)
-	}
-
-	log(buffer[:n])
+	time.Sleep(time.Second)
 
 	// // sub
 	// if _, err := conn.Write([]byte("sub foo 1" + end)); err != nil {
 	// 	panic(err)
 	// }
 
-	// n, err = conn.Read(buffer)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// log(buffer[:n])
-
 	// // pub
 	// if _, err := conn.Write([]byte("pub foo 3" + end + "bar" + end)); err != nil {
 	// 	panic(err)
 	// }
-
-	// n, err = conn.Read(buffer)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// log(buffer[:n])
-
-	// // get last pub
-	// n, err = conn.Read(buffer)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// log(buffer[:n])
 }
 
-func log(msg []byte) {
-	m := bytes.Split(msg, []byte{13, 10})
-
-	for _, m := range m {
-		if len(m) > 0 {
-			fmt.Println(string(m))
+func handleResponses(conn net.Conn) {
+	reader := bufio.NewReader(conn)
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		res := scanner.Text()
+		msgs := strings.Split(res, end)
+		for _, msg := range msgs {
+			if msg != "" {
+				fmt.Println(scanner.Text())
+			}
 		}
 	}
-
-	time.Sleep(time.Millisecond * 500)
+	if err := scanner.Err(); err != nil {
+		if !errors.Is(err, io.EOF) {
+			fmt.Println("failed to read bytes from the connection")
+			panic(err)
+		}
+	}
 }

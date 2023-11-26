@@ -139,12 +139,14 @@ func (e *Engine) handleMessage(conn net.Conn, message []byte) {
 			return
 		}
 
+		e.logger.Debug("command received", slog.String("client", addr), slog.String("command", cmd.String()))
 		e.handleCommand(conn, cmd)
 
 		return
 	}
 
 	if client.Command.Data == nil {
+		e.logger.Debug("data received", slog.String("client", addr), slog.Int("data size", len(message)))
 		e.handleData(conn, message)
 	}
 }
