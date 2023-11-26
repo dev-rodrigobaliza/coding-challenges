@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
@@ -15,20 +14,13 @@ type Command struct {
 }
 
 func newCommand(req []byte) *Command {
-	parts := bytes.Split(req, []byte(newLine))
-	parts = parts[:len(parts)-1]
-	if len(parts) < 1 || len(parts) > 2 {
-		return nil
-	}
-
 	var (
 		name   string
 		topic  string
 		number int
-		data   []byte
 	)
 
-	headers := strings.Split(string(parts[0]), " ")
+	headers := strings.Split(string(req), " ")
 	if len(headers) < 1 {
 		return nil
 	}
@@ -36,12 +28,11 @@ func newCommand(req []byte) *Command {
 	name = strings.ToLower(headers[0])
 	switch name {
 	case "connect":
-		break
+		if headers[1] != "{}" {
+			return nil
+		}
 
 	case "ping":
-		break
-
-	case "pong":
 		break
 
 	case "sub":
@@ -55,11 +46,6 @@ func newCommand(req []byte) *Command {
 		if topic == "" || number == 0 {
 			return nil
 		}
-		if len(parts) < 2 {
-			return nil
-		}
-
-		data = parts[1]
 
 	default:
 		return nil
@@ -69,7 +55,6 @@ func newCommand(req []byte) *Command {
 		Name:   name,
 		Topic:  topic,
 		Number: number,
-		Data:   data,
 	}
 
 	return &cmd

@@ -1,8 +1,9 @@
 package store
 
-type Store interface {
+type Store[D any] interface {
 	Clear()
 	Delete(key string)
-	Get(key string) string
-	Set(key string, value string)
+	Get(key string) D
+	Set(key string, value D)
+	Len() int
 }

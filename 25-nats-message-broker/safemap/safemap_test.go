@@ -7,19 +7,19 @@ import (
 )
 
 var (
-	safeMap = safemap.New()
+	safeMap = safemap.New[string]()
 )
 
 func TestNew(t *testing.T) {
 	tests := []struct {
 		name string
-		want *safemap.SafeMap
+		want *safemap.SafeMap[string]
 	}{
 		{"int int", safeMap},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := safemap.New(); !reflect.DeepEqual(got, tt.want) {
+			if got := safemap.New[string](); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("New() = %v, want %v", got, tt.want)
 			}
 		})
@@ -29,7 +29,7 @@ func TestNew(t *testing.T) {
 func TestSafeMap_Insert(t *testing.T) {
 	tests := []struct {
 		name      string
-		s         *safemap.SafeMap
+		s         *safemap.SafeMap[string]
 		key       string
 		value     string
 		wantKey   string

@@ -1,11 +1,13 @@
 package engine
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"nats/logs"
+	"nats/safemap"
 	"nats/store"
 	"net"
 )
@@ -13,22 +15,40 @@ import (
 const (
 	network = "tcp"
 	newLine = "\r\n"
+
+	ok             = "+OK"
+	pong           = "PONG"
+	info           = "INFO"
+	errPrefix      = "-ERR"
+	unknownCommand = "Unknown Protocol Operation"
 )
 
 type Engine struct {
 	addr     string
 	logger   *slog.Logger
-	data     store.Store
+	topics   store.Store[map[string]struct{}]
+	clients  store.Store[*Client]
 	listener net.Listener
 }
 
-func New(addr string, data store.Store, logAll bool) *Engine {
+func New(addr, dsn string, logAll bool) *Engine {
 	logger := logs.New(logAll)
+	topics, err := getStore[map[string]struct{}](dsn)
+	if err != nil {
+		logger.Error("failed to create the topics store", slog.String("dsn", dsn))
+		panic(err)
+	}
+	clients, err := getStore[*Client](dsn)
+	if err != nil {
+		logger.Error("failed to create the clients store", slog.String("dsn", dsn))
+		panic(err)
+	}
 
 	return &Engine{
-		addr:   addr,
-		logger: logger,
-		data:   data,
+		addr:    addr,
+		logger:  logger,
+		topics:  topics,
+		clients: clients,
 	}
 }
 
@@ -64,68 +84,122 @@ func (e *Engine) handleConnections() {
 			continue
 		}
 
-		addr := conn.RemoteAddr().String()
-		e.logger.Debug("new client connected", slog.String("addr", addr))
+		c := newClient(conn.RemoteAddr().String())
+		e.clients.Set(c.Addr, c)
+		e.sendInfo(conn)
+		go e.handleRequests(conn)
 
-		go e.handleRequest(conn)
+		e.logger.Debug("new client connected", slog.String("addr", c.Addr), slog.Int("clients connected", e.clients.Len()))
 	}
 }
 
-func (e *Engine) handleRequest(conn net.Conn) {
-	buffer := make([]byte, 1024)
-	for {
-		size, err := conn.Read(buffer)
-		if err != nil {
-			if !errors.Is(err, io.EOF) {
-				e.logger.Error("failed to read bytes from the connection", slog.Any("err", err))
-			}
+func (e *Engine) handleRequests(conn net.Conn) {
+	addr := conn.RemoteAddr().String()
+	client := e.clients.Get(addr)
+	if client.Addr == "" {
+		e.logger.Warn("received request from an unknown client", slog.String("addr", addr))
+		conn.Close()
 
-			break
-		}
+		return
+	}
 
-		if size > 0 {
-			go e.handleMessage(conn, buffer[:size])
+	reader := bufio.NewReader(conn)
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		go e.handleMessage(conn, scanner.Bytes())
+	}
+	if err := scanner.Err(); err != nil {
+		if !errors.Is(err, io.EOF) {
+			e.logger.Error("failed to read bytes from the connection", slog.Any("err", err))
 		}
 	}
 
-	conn.Close()
-	e.logger.Error("client disconnected")
+	if err := conn.Close(); err != nil {
+		e.logger.Error("failed to close the client connection", slog.String("addr", addr), slog.Any("err", err))
+	}
+
+	e.clients.Delete(addr)
+	e.logger.Error("client disconnected", slog.String("addr", addr), slog.Int("clients connected", e.clients.Len()))
 }
 
 func (e *Engine) handleMessage(conn net.Conn, message []byte) {
 	addr := conn.RemoteAddr().String()
-	cmd := newCommand(message)
-	if cmd == nil {
-		e.logger.Warn("invalid command received", slog.String("client", addr), slog.String("message", fmt.Sprintf("%x", message)))
-		e.sendError(conn)
+	client := e.clients.Get(addr)
+	if client.Addr == "" {
+		e.logger.Warn("received message from an unknown client", slog.String("addr", addr))
+
 		return
 	}
 
-	e.logger.Debug("message received", slog.String("client", addr), slog.String("command", cmd.String()))
-	e.handleCommand(conn, cmd)
-}
+	if client.Command == nil {
+		cmd := newCommand(message)
+		if cmd == nil {
+			e.logger.Warn("invalid command received", slog.String("client", addr), slog.String("message", fmt.Sprintf("%x", message)))
+			e.sendError(conn, unknownCommand)
+			return
+		}
 
-func (e *Engine) handleCommand(conn net.Conn, cmd *Command) {
-	switch cmd.Name {
-	case "pub":
-		e.logger.Debug("pub cmd")
+		e.handleCommand(conn, cmd)
 
-	case "sub":
-		e.logger.Debug("sub cmd")
+		return
+	}
 
-	default:
-		e.logger.Warn("unknown command received", slog.String("command", cmd.String()))
-		e.sendError(conn)
+	if client.Command.Data == nil {
+		e.handleData(conn, message)
 	}
 }
 
-func (e *Engine) sendError(conn net.Conn) {
-	e.sendMessage(conn, "NOK")
+func (e *Engine) handleCommand(conn net.Conn, cmd *Command) {
+	addr := conn.RemoteAddr().String()
+	client := e.clients.Get(addr)
+	if client.Addr == "" {
+		e.logger.Warn("received command from an unknown client", slog.String("addr", addr))
+
+		return
+	}
+
+	if cmd.Name != "connect" && !client.Connected {
+		conn.Close()
+	}
+
+	switch cmd.Name {
+	case "connect":
+		client.Connected = true
+		e.sendCommand(conn, ok)
+
+	case "ping":
+		client.Command = nil
+		e.sendCommand(conn, pong)
+
+	case "pub":
+		// topic exists?
+		// send ok after send to topic clients
+		break
+
+	case "sub":
+		// topic exists?
+		// send ok after include client into the topic
+		break
+
+	default:
+		e.logger.Warn("unknown command received", slog.String("client", addr), slog.String("command", cmd.String()))
+		e.sendError(conn, unknownCommand)
+	}
 }
 
-func (e *Engine) sendCommand(conn net.Conn, cmd *Command, msg string) {
-	// msg = fmt.Sprintf("%s %s %d %d", msg, cmd.Key, cmd.Flags, cmd.Size)
-	// e.sendMessage(conn, msg, string(cmd.Data), end)
+func (e *Engine) handleData(conn net.Conn, message []byte) {}
+
+func (e *Engine) sendError(conn net.Conn, msg string) {
+	e.sendMessage(conn, fmt.Sprintf("%s '%s'", errPrefix, msg))
+}
+
+func (e *Engine) sendCommand(conn net.Conn, msg string) {
+	e.sendMessage(conn, msg, newLine)
+}
+
+func (e *Engine) sendInfo(conn net.Conn) {
+	msg := fmt.Sprintf(`INFO {"server_addr": "%s", "client_addr": "%s"}`, e.addr, conn.RemoteAddr().String())
+	e.sendMessage(conn, msg, newLine)
 }
 
 func (e *Engine) sendMessage(conn net.Conn, msgs ...string) {
@@ -143,4 +217,13 @@ func (e *Engine) sendMessage(conn net.Conn, msgs ...string) {
 
 	addr := conn.RemoteAddr().String()
 	e.logger.Debug("message sent", slog.String("client", addr), slog.Int("message size", total))
+}
+
+func getStore[D any](dsn string) (store.Store[D], error) {
+	if dsn == ":memory:" {
+		data := safemap.New[D]()
+		return data, nil
+	}
+
+	return nil, errors.New("unknown store")
 }
