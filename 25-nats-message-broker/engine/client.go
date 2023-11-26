@@ -1,13 +1,19 @@
 package engine
 
+import "net"
+
 type Client struct {
-	Addr      string
+	Conn      net.Conn
 	Connected bool
 	Command   *Command
 }
 
-func newClient(addr string) *Client {
+func newClient(conn net.Conn) *Client {
 	return &Client{
-		Addr: addr,
+		Conn: conn,
 	}
+}
+
+func (c *Client) Addr() string {
+	return c.Conn.RemoteAddr().String()
 }

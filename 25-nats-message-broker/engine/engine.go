@@ -19,8 +19,14 @@ const (
 	ok             = "+OK"
 	pong           = "PONG"
 	info           = "INFO"
+	message        = "MSG"
 	errPrefix      = "-ERR"
 	unknownCommand = "Unknown Protocol Operation"
+	unexpectedData = "Unexpected Data"
+)
+
+var (
+	ErrTopicNotFound = errors.New("topic not found")
 )
 
 type Engine struct {
@@ -62,15 +68,12 @@ func (e *Engine) Start() error {
 	}
 
 	e.listener = listen
-
 	go e.handleConnections()
-
 	return nil
 }
 
 func (e *Engine) Stop() error {
 	e.logger.Info("stoping the server", slog.String("addr", e.addr))
-
 	return e.listener.Close()
 }
 
@@ -84,22 +87,21 @@ func (e *Engine) handleConnections() {
 			continue
 		}
 
-		c := newClient(conn.RemoteAddr().String())
-		e.clients.Set(c.Addr, c)
+		c := newClient(conn)
+		e.clients.Set(c.Addr(), c)
 		e.sendInfo(conn)
 		go e.handleRequests(conn)
 
-		e.logger.Debug("new client connected", slog.String("addr", c.Addr), slog.Int("clients connected", e.clients.Len()))
+		e.logger.Debug("new client connected", slog.String("addr", c.Addr()), slog.Int("clients connected", e.clients.Len()))
 	}
 }
 
 func (e *Engine) handleRequests(conn net.Conn) {
 	addr := conn.RemoteAddr().String()
 	client := e.clients.Get(addr)
-	if client.Addr == "" {
+	if client.Addr() == "" {
 		e.logger.Warn("received request from an unknown client", slog.String("addr", addr))
 		conn.Close()
-
 		return
 	}
 
@@ -125,43 +127,32 @@ func (e *Engine) handleRequests(conn net.Conn) {
 func (e *Engine) handleMessage(conn net.Conn, message []byte) {
 	addr := conn.RemoteAddr().String()
 	client := e.clients.Get(addr)
-	if client.Addr == "" {
+	if client == nil || client.Addr() == "" {
 		e.logger.Warn("received message from an unknown client", slog.String("addr", addr))
-
 		return
 	}
 
-	if client.Command == nil {
-		cmd := newCommand(message)
-		if cmd == nil {
-			e.logger.Warn("invalid command received", slog.String("client", addr), slog.String("message", fmt.Sprintf("%x", message)))
-			e.sendError(conn, unknownCommand)
-			return
-		}
-
-		e.logger.Debug("command received", slog.String("client", addr), slog.String("command", cmd.String()))
-		e.handleCommand(conn, cmd)
-
-		return
-	}
-
-	if client.Command.Data == nil {
+	if client.Command != nil {
 		e.logger.Debug("data received", slog.String("client", addr), slog.Int("data size", len(message)))
 		e.handleData(conn, message)
+		return
 	}
+
+	cmd := newCommand(message)
+	e.handleCommand(conn, cmd)
 }
 
 func (e *Engine) handleCommand(conn net.Conn, cmd *Command) {
 	addr := conn.RemoteAddr().String()
 	client := e.clients.Get(addr)
-	if client.Addr == "" {
+	if client.Addr() == "" {
 		e.logger.Warn("received command from an unknown client", slog.String("addr", addr))
-
 		return
 	}
 
-	if cmd.Name != "connect" && !client.Connected {
+	if !client.Connected && (cmd == nil || cmd.Name != "connect") {
 		conn.Close()
+		return
 	}
 
 	switch cmd.Name {
@@ -170,33 +161,101 @@ func (e *Engine) handleCommand(conn net.Conn, cmd *Command) {
 		e.sendCommand(conn, ok)
 
 	case "ping":
-		client.Command = nil
 		e.sendCommand(conn, pong)
 
 	case "pub":
-		// topic exists?
-		// send ok after send to topic clients
-		break
+		client.Command = cmd
 
 	case "sub":
-		// topic exists?
-		// send ok after include client into the topic
-		break
+		clients := e.topics.Get(cmd.Topic)
+		if clients == nil {
+			clients = make(map[string]struct{})
+			e.topics.Set(cmd.Topic, clients)
+		}
+
+		clients[addr] = struct{}{}
+		e.topics.Set(cmd.Topic, clients)
+		e.sendCommand(conn, ok)
+		e.logger.Debug("new topic subscription", slog.String("topic", cmd.Topic), slog.String("client", addr), slog.Int("subscribers", len(clients)))
+
+	case "unsub":
+		clients := e.topics.Get(cmd.Topic)
+		if clients != nil {
+			delete(clients, addr)
+			e.topics.Set(cmd.Topic, clients)
+		}
+
+		e.sendCommand(conn, ok)
+		e.logger.Debug("topic unsubscription", slog.String("topic", cmd.Topic), slog.String("client", addr), slog.Int("subscribers", len(clients)))
 
 	default:
 		e.logger.Warn("unknown command received", slog.String("client", addr), slog.String("command", cmd.String()))
+		if !client.Connected {
+			conn.Close()
+			return
+		}
+
 		e.sendError(conn, unknownCommand)
 	}
 }
 
-func (e *Engine) handleData(conn net.Conn, message []byte) {}
+func (e *Engine) handleData(conn net.Conn, message []byte) {
+	addr := conn.RemoteAddr().String()
+	client := e.clients.Get(addr)
+	if client.Addr() == "" {
+		e.logger.Warn("received command from an unknown client", slog.String("addr", addr))
+		return
+	}
+
+	switch client.Command.Name {
+	case "pub":
+		e.sendCommand(conn, ok)
+		e.sendTopic(client.Command.Topic, string(message))
+
+	default:
+		e.logger.Warn("unexpected data received", slog.String("client", addr), slog.Int("data size", len(message)))
+		e.sendError(conn, unknownCommand)
+	}
+
+	client.Command = nil
+}
 
 func (e *Engine) sendError(conn net.Conn, msg string) {
 	e.sendMessage(conn, fmt.Sprintf("%s '%s'", errPrefix, msg))
 }
 
 func (e *Engine) sendCommand(conn net.Conn, msg string) {
-	e.sendMessage(conn, msg, newLine)
+	e.sendMessage(conn, msg)
+}
+
+func (e *Engine) sendTopic(topic, msg string) {
+	clients := e.topics.Get(topic)
+
+	for addr := range clients {
+		client := e.clients.Get(addr)
+		if client == nil || client.Conn == nil {
+			e.clients.Delete(addr)
+			delete(clients, addr)
+			e.topics.Set(topic, clients)
+			continue
+		}
+
+		e.sendCommand(client.Conn, fmt.Sprintf("%s %s", message, topic))
+		e.sendCommand(client.Conn, msg)
+	}
+}
+
+func (e *Engine) sendBroadcast(msg string) {
+	addrs := e.clients.GetAllKeys()
+	for _, addr := range addrs {
+		client := e.clients.Get(addr)
+		if client == nil || client.Conn == nil {
+			e.clients.Delete(addr)
+			continue
+		}
+
+		e.sendCommand(client.Conn, msg)
+	}
 }
 
 func (e *Engine) sendInfo(conn net.Conn) {
@@ -226,6 +285,5 @@ func getStore[D any](dsn string) (store.Store[D], error) {
 		data := safemap.New[D]()
 		return data, nil
 	}
-
 	return nil, errors.New("unknown store")
 }

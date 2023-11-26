@@ -6,4 +6,5 @@ type Store[D any] interface {
 	Get(key string) D
 	Set(key string, value D)
 	Len() int
+	GetAllKeys() []string
 }

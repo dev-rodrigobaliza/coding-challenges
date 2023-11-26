@@ -52,3 +52,16 @@ func (s *SafeMap[D]) Len() int {
 
 	return len(s.data)
 }
+
+func (s *SafeMap[D]) GetAllKeys() []string {
+	s.RLock()
+	defer s.RUnlock()
+
+	keys := make([]string, 0, len(s.data))
+
+	for key := range s.data {
+		keys = append(keys, key)
+	}
+
+	return keys
+}

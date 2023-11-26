@@ -10,7 +10,6 @@ type Command struct {
 	Name   string `json:"name"`
 	Topic  string `json:"topic,omitempty"`
 	Number int    `json:"number,omitempty"`
-	Data   []byte `json:"data,omitempty"`
 }
 
 func newCommand(req []byte) *Command {
@@ -28,21 +27,21 @@ func newCommand(req []byte) *Command {
 	name = strings.ToLower(headers[0])
 	switch name {
 	case "connect":
-		if headers[1] != "{}" {
+		if headers[1][0] != '{' || headers[1][len(headers[1])-1] != '}' {
 			return nil
 		}
 
 	case "ping":
 		break
 
-	case "sub":
-		topic, number := parseHeader(headers)
-		if topic == "" || number == 0 {
+	case "sub", "unsub":
+		topic, number = parseHeader(headers)
+		if topic == "" {
 			return nil
 		}
 
 	case "pub":
-		topic, number := parseHeader(headers)
+		topic, number = parseHeader(headers)
 		if topic == "" || number == 0 {
 			return nil
 		}
@@ -68,23 +67,26 @@ func (c *Command) String() string {
 	if c.Number > 0 {
 		s = fmt.Sprintf("%s[number: %d]", s, c.Number)
 	}
-	if len(c.Data) > 0 {
-		s = fmt.Sprintf("%s[data: %d]", s, len(c.Data))
-	}
 
 	return s
 }
 
-func parseHeader(headers []string) (string, int) {
-	if len(headers) != 3 {
-		return "", 0
+func parseHeader(headers []string) (t string, n int) {
+	if len(headers) < 2 {
+		return
 	}
 
-	t := headers[1]
-	n, err := strconv.Atoi(headers[2])
-	if err != nil {
-		return "", 0
+	if len(headers) > 1 {
+		t = headers[1]
 	}
 
-	return t, n
+	if len(headers) > 2 {
+		var err error
+		n, err = strconv.Atoi(headers[2])
+		if err != nil {
+			return "", 0
+		}
+	}
+
+	return
 }
