@@ -1,26 +1,24 @@
 package algorithms
 
 import (
-	"rl/safemap"
 	"rl/store"
 	"time"
 )
 
 type TokenBucket struct {
 	limit    int
-	buckets  store.Store
+	store    store.Store
 	ticker   *time.Ticker
 	doneChan chan bool
 }
 
-func NewTokenBucket(dsn string, limit int) *TokenBucket {
-	buckets := getStore(dsn)
-	ticker := time.NewTicker(time.Second)
+func NewTokenBucket(store store.Store, limit int, dur time.Duration) *TokenBucket {
+	ticker := time.NewTicker(dur)
 	done := make(chan bool)
 
 	tk := TokenBucket{
 		limit:    limit,
-		buckets:  buckets,
+		store:    store,
 		ticker:   ticker,
 		doneChan: done,
 	}
@@ -32,7 +30,7 @@ func NewTokenBucket(dsn string, limit int) *TokenBucket {
 				return
 
 			case <-ticker.C:
-				tk.Inc()
+				tk.IncAll()
 			}
 		}
 	}()
@@ -45,26 +43,19 @@ func (tk *TokenBucket) Stop() {
 	tk.doneChan <- true
 }
 
-func (tk *TokenBucket) Inc() {
-	tk.buckets.IncAll(1)
+func (tk *TokenBucket) IncAll() {
+	tk.store.IncAll(1)
 }
 
 func (tk *TokenBucket) IsAllowed(key string) bool {
-	if !tk.buckets.Has(key) {
-		tk.buckets.Set(key, tk.limit)
+	if !tk.store.Has(key) {
+		tk.store.Set(key, tk.limit)
 	}
 
-	v := tk.buckets.Get(key)
+	v := tk.store.Get(key)
 	if v < 1 {
 		return false
 	}
 
-	return tk.buckets.Inc(key, -1)
-}
-
-func getStore(dsn string) store.Store {
-	switch dsn {
-	default:
-		return safemap.New()
-	}
+	return tk.store.Inc(key, -1)
 }

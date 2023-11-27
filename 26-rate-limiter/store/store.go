@@ -7,6 +7,7 @@ type Store interface {
 	Get(key string) int
 	Inc(key string, delta int) bool
 	IncAll(delta int)
+	Restore(delta int)
 	Set(key string, value int)
 	Len() int
 	GetAllKeys() []string

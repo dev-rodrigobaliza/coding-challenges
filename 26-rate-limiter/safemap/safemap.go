@@ -49,8 +49,8 @@ func (s *SafeMap) Get(key string) int {
 }
 
 func (s *SafeMap) Inc(key string, delta int) bool {
-	s.RLock()
-	defer s.RUnlock()
+	s.Lock()
+	defer s.Unlock()
 
 	value, ok := s.data[key]
 	if !ok {
@@ -64,12 +64,21 @@ func (s *SafeMap) Inc(key string, delta int) bool {
 }
 
 func (s *SafeMap) IncAll(delta int) {
-	s.RLock()
-	defer s.RUnlock()
+	s.Lock()
+	defer s.Unlock()
 
 	for k, v := range s.data {
 		v += delta
 		s.data[k] = v
+	}
+}
+
+func (s *SafeMap) Restore(delta int) {
+	s.Lock()
+	defer s.Unlock()
+
+	for k := range s.data {
+		s.data[k] = delta
 	}
 }
 
