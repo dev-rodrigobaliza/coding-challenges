@@ -29,6 +29,9 @@
 		},
 		{
 			"path": "25-nats-message-broker"
+		},
+		{
+			"path": "26-rate-limiter"
 		}
 	],
 	"settings": {},
