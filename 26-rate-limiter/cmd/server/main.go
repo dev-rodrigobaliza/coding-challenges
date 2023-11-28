@@ -16,8 +16,8 @@ import (
 func main() {
 	addr := flag.String("addr", ":8080", "server address to listen requests")
 	dsn := flag.String("dsn", ":memory:", "store dsn")
-	limit := flag.Int("limit", 10, "max requests")
-	dur := flag.String("dur", "1s", "limiter duration")
+	limit := flag.Int("limit", 2, "max requests")
+	dur := flag.String("dur", "10s", "limiter duration")
 	log := flag.Bool("log", true, "log messages")
 
 	flag.Parse()
@@ -28,8 +28,9 @@ func main() {
 	}
 
 	// tk := getTokenBucket(*dsn, *dur, *limit)
-	fw := getFixedWindow(*dsn, *dur, *limit)
-	api := api.New(fw, *log)
+	// fw := getFixedWindow(*dsn, *dur, *limit)
+	sw := getSlidingWindow(*dsn, *dur, *limit)
+	api := api.New(sw, *log)
 	api.Start(*addr)
 
 	c := make(chan os.Signal, 1)
@@ -72,4 +73,10 @@ func getFixedWindow(dsn, dur string, limit int) *algorithms.FixedWindow {
 	s := getStore(dsn)
 	d := getDuration(dur)
 	return algorithms.NewFixedWindow(s, limit, d)
+}
+
+func getSlidingWindow(dsn, dur string, limit int) *algorithms.SlidingWindow {
+	s := getStore(dsn)
+	d := getDuration(dur)
+	return algorithms.NewSlidingWindow(s, limit, d)
 }

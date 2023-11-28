@@ -11,6 +11,10 @@ import (
 	"github.com/google/uuid"
 )
 
+type ContextKey string
+
+const ContextKeyID ContextKey = "id"
+
 type Api struct {
 	rl     *limiter.Limiter
 	logger *slog.Logger
@@ -62,34 +66,32 @@ func (a *Api) Stop() {
 func (a *Api) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		id := uuid.New()
-		a.logger.Info("request started", slog.String("method", r.Method), slog.String("path", r.URL.Path), slog.String("client", r.RemoteAddr), slog.String("id", id.String()))
-		next.ServeHTTP(w, r)
-		a.logger.Info("request finished", slog.String("id", id.String()), slog.String("elapsed", time.Since(start).String()))
+		id := uuid.New().String()
+		a.logger.Info("request started", slog.String("id", id), slog.String("method", r.Method), slog.String("path", r.URL.Path), slog.String("client", r.RemoteAddr))
+		ctx := context.WithValue(r.Context(), ContextKeyID, id)
+		next.ServeHTTP(w, r.WithContext(ctx))
+		a.logger.Info("request finished", slog.String("id", id), slog.String("elapsed", time.Since(start).String()))
 	})
 }
 
 func (a *Api) ratelimitMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := r.Context().Value(ContextKeyID)
 		ip := r.RemoteAddr
-		if !a.rl.Can(ip) {
-			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
+		if a.rl.Can(id.(string), ip) {
+			next.ServeHTTP(w, r)
+			return
 		}
 
-		next.ServeHTTP(w, r)
+		a.logger.Info("rate limited request", slog.String("method", r.Method), slog.String("path", r.URL.Path), slog.String("client", r.RemoteAddr))
+		http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 	})
 }
 
 func getLimited(w http.ResponseWriter, r *http.Request) {
-	// header
-	w.Header().Set("x-rate-limit-remaining", "1")
-	// body
 	w.Write([]byte("Limited, don't over use me!"))
 }
 
 func getUnlimited(w http.ResponseWriter, r *http.Request) {
-	// header
-	w.Header().Set("x-rate-limit-remaining", "-")
-	// body
 	w.Write([]byte("Unlimited! Let's Go!"))
 }

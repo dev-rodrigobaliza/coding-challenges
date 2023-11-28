@@ -1,7 +1,7 @@
 package limiter
 
 type Algorithm interface {
-	IsAllowed(string) bool
+	IsAllowed(string, string) bool
 	Stop()
 }
 
@@ -19,6 +19,6 @@ func (l *Limiter) Stop() {
 	l.algo.Stop()
 }
 
-func (l *Limiter) Can(key string) bool {
-	return l.algo.IsAllowed(key)
+func (l *Limiter) Can(id, key string) bool {
+	return l.algo.IsAllowed(id, key)
 }
